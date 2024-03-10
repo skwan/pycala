@@ -6,6 +6,8 @@
 # Copyright 2024
 #
 
+import constants
+
 #
 # Initialize game board
 #
@@ -13,11 +15,7 @@ def initGameBoard(mancalaBoard, numPebbles):
     #
     # Gameboard index values:
     # [0]-[5]: Player 1's game pods
-    # [6]: Player 1's score pod
     # [7]-[12]: Player 2's game pods
-    # [13]: Player 2's score pod
-    # [14]: Game turn number, initialized to 1
-    # [15]: Current player, initialized to 0
     # [16]: Error result from last turn, negative values are errors, 0 is play next turn, 1 is game is complete
     #
     mancalaBoard = [numPebbles,numPebbles,numPebbles,numPebbles,numPebbles,numPebbles,0,numPebbles,numPebbles,numPebbles,numPebbles,numPebbles,numPebbles,0,1,0,0]
@@ -82,65 +80,81 @@ def checkFinishingConditions(mancalaBoard):
         mancalaBoard[16] = 1
     return mancalaBoard
 
+#
+# Check for a free turn
+#
+def checkFreeTurn(mancalaBoard, index):
+    freeTurn = constants.NO_FREE_TURN
+    # Drop in own score pod, receive free turn
+    if mancalaBoard[constants.CURRENT_PLAYER] == 1 and index == 6:
+        freeTurn = constants.FREE_TURN
+    if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index == 13:
+        freeTurn = constants.FREE_TURN
+    if freeTurn == constants.FREE_TURN:
+        print("Free turn!")
+        print("")
+    return freeTurn
+
 # Process a game turn
 def gameTurn(mancalaBoard, podIndex):
     # Reset game state to 0
-    mancalaBoard[16] = 0
-    nextPlayer = "Yes"
+    mancalaBoard[constants.TURN_RESULT] = 0
+    freeTurn = constants.NO_FREE_TURN
     inHand = 0
     # If the move is off the board, return error
-    if int(podIndex) < 0 or int(podIndex) > 12:
-        mancalaBoard[16] = -1
+    if podIndex < 0 or podIndex > 12:
+        mancalaBoard[constants.TURN_RESULT] = -1
         return mancalaBoard
-    if int(podIndex) > 0 and int(podIndex) < 7:
-        # If the initial move, set player to player 1
-        if mancalaBoard[15]== 0:
-            mancalaBoard[15] = 1
-        # Else if this is player 2, the move is illegal
-        elif mancalaBoard[15] == 2:
-            mancalaBoard[16] = -2
+    # If no player is yet selected, the initialize the current player
+    if mancalaBoard[constants.CURRENT_PLAYER] == 0:
+        if podIndex < 7:
+            mancalaBoard[constants.CURRENT_PLAYER] = 1
+        elif podIndex > 6:
+            mancalaBoard[constants.CURRENT_PLAYER] = 2
+    # If this is player 1's turn
+    if mancalaBoard[constants.CURRENT_PLAYER] == 1:
+        # Check if they are trying to move player 2's pod
+        if podIndex > 6:
+            mancalaBoard[constants.TURN_RESULT] = -2
             return mancalaBoard
-        # Set the index of the pod to be moved down by 1 since the pod 1 is index 0
-        index = int(podIndex) - 1
-    if int(podIndex) > 6 and int(podIndex) < 13:
-        # If the initial move, set player to player 2
-        if mancalaBoard[15] == 0:
-            mancalaBoard[15] = 2
-        # Else if this is player 1, the move is illegal
-        elif mancalaBoard[15] == 1:
-            mancalaBoard[16] = -2
+        # Otherwise set the index to move down by one because python arrays start with 0
+        else:
+            index = podIndex - 1
+    # If this is player 2's turn
+    if mancalaBoard[constants.CURRENT_PLAYER] == 2:
+        # Check if they are trying to move player 1's pod
+        if podIndex < 7:
+            mancalaBoard[constants.TURN_RESULT] = -2
             return mancalaBoard
-        # For player 2, the index of the pod to be moved is the same as the input index
-        index = int(podIndex)
-    # If the player selected an empty cala, return error
+        # Otherwise set the index to be played
+        else:
+            index = podIndex
+    # If the player selected an empty pod, return error
     if mancalaBoard[index] == 0:
-        mancalaBoard[16] = -3
+        mancalaBoard[constants.TURN_RESULT] = -3
         return mancalaBoard
     # Pick up the pebbles in that pod into your hand
     inHand = mancalaBoard[index]
     mancalaBoard[index] = 0
+    # Drop pebbles in each next pod until your hand is empty
     while inHand > 0:
         # Move to the next pod
         index = index + 1
         # If player 1 and the next pod is player 2's, skip it and turn the corner
-        if mancalaBoard[15] == 1 and index == 13:
+        if mancalaBoard[constants.CURRENT_PLAYER] == 1 and index == 13:
             index = 0
         # If player 2 and the next pod is player 1's, skip it and turn the corner
-        if mancalaBoard[15] == 2 and index == 6:
+        if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index == 6:
             index = 7
         # if player 2 and the next pod is off the end of the board, turn the corner
-        if mancalaBoard[15] == 2 and index == 14:
+        if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index == 14:
             index = 0
-        # Take a pebble out of your hand and put it in the cala
+        # Take a pebble out of your hand and put it in the pod
         inHand = inHand - 1
         mancalaBoard[index] = mancalaBoard[index] + 1
     # Special rules
-    if mancalaBoard[15] == 1:
-        # Drop in own score pod, receive free turn
-        if index == 6:
-            print("Free turn!")
-            print("")
-            nextPlayer = "No"
+    freeTurn = checkFreeTurn(mancalaBoard, index)
+    if mancalaBoard[constants.CURRENT_PLAYER] == 1:
         # Drop on own side in empty pod, steal opposing pod
         if index > -1 and index < 6:
             if mancalaBoard[index] == 1 and mancalaBoard[12-index] != 0:
@@ -148,12 +162,7 @@ def gameTurn(mancalaBoard, podIndex):
                 print("Steal pod %s!" % stealIndex)
                 print("")
                 mancalaBoard = steal(mancalaBoard, index, 6)
-    if mancalaBoard[15] == 2:
-        # Drop in own pod, receive free turn
-        if index == 13:
-            print("Free turn!")
-            print("")
-            nextPlayer = "No"
+    if mancalaBoard[constants.CURRENT_PLAYER] == 2:
         # Drop on own side in empty pod, steal opposing pod
         if index > 6 and index < 13:
             if mancalaBoard[index] == 1 and mancalaBoard[12-index] != 0:
@@ -163,14 +172,13 @@ def gameTurn(mancalaBoard, podIndex):
                 print("")
                 mancalaBoard = steal(mancalaBoard, index, 13)
     # Advance to next player
-    if nextPlayer == "Yes":
-        # Increment turn number
-        mancalaBoard[14] = mancalaBoard[14] + 1
-        # Go to next player
-        if mancalaBoard[15] == 1:
-            mancalaBoard[15] = 2
+    if freeTurn == constants.NO_FREE_TURN:
+        if mancalaBoard[constants.CURRENT_PLAYER] == 1:
+            mancalaBoard[constants.CURRENT_PLAYER] = 2
         else:
-            mancalaBoard[15] = 1
+            mancalaBoard[constants.CURRENT_PLAYER] = 1
+    # Increment turn number
+    mancalaBoard[constants.GAME_TURN] = mancalaBoard[constants.GAME_TURN] + 1
     # See if the game is won
     mancalaBoard = checkFinishingConditions(mancalaBoard)
     return mancalaBoard
@@ -215,17 +223,17 @@ while mancalaBoard[16] != 1:
     print("")
     printGameBoard(mancalaBoard)
     if debug == 1:
-        print("Game state: %s" % mancalaBoard[16])
+        print("Game state: %s" % mancalaBoard[constants.TURN_RESULT])
         print("")
-    print("Turn: %s" % mancalaBoard[14])
-    if mancalaBoard[15] == 0:
+    print("Turn: %s" % mancalaBoard[constants.GAME_TURN])
+    if mancalaBoard[constants.CURRENT_PLAYER] == 0:
         print("Player: Not Selected")
         print("Select pod to play (1-12) or X to exit")
     else:
-        print("Player: %s" % mancalaBoard[15])
-        if mancalaBoard[15] == 1:
+        print("Player: %s" % mancalaBoard[constants.CURRENT_PLAYER])
+        if mancalaBoard[constants.CURRENT_PLAYER] == 1:
             print("Select cala to play (1-6), U to undo, or X to exit")
-        if mancalaBoard[15] == 2:
+        if mancalaBoard[constants.CURRENT_PLAYER] == 2:
             print("Select cala to play (7-12), U to undo, or X to exit")
     playerInput = input()
     print("")
@@ -233,7 +241,7 @@ while mancalaBoard[16] != 1:
         # Exit game
         print("Exiting game")
         break
-    mancalaBoard = gameTurn(mancalaBoard, playerInput)
+    mancalaBoard = gameTurn(mancalaBoard, int(playerInput))
     if mancalaBoard[16] < 0:
         print("Illegal move, try again.")
 if mancalaBoard[16] == 1:
