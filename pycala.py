@@ -74,10 +74,10 @@ def checkFinishingConditions(mancalaBoard):
     player2Remaining = countPebblesRemaining(mancalaBoard, 2)
     if player1Remaining == 0:
         sweepPebblesRemaining(mancalaBoard, 2)
-        mancalaBoard[16] = 1
+        mancalaBoard[constants.TURN_RESULT] = constants.GAME_COMPLETE
     if player2Remaining == 0:
         sweepPebblesRemaining(mancalaBoard, 1)
-        mancalaBoard[16] = 1
+        mancalaBoard[constants.TURN_RESULT] = constants.GAME_COMPLETE
     return mancalaBoard
 
 #
@@ -86,14 +86,35 @@ def checkFinishingConditions(mancalaBoard):
 def checkFreeTurn(mancalaBoard, index):
     freeTurn = constants.NO_FREE_TURN
     # Drop in own score pod, receive free turn
-    if mancalaBoard[constants.CURRENT_PLAYER] == 1 and index == 6:
+    if mancalaBoard[constants.CURRENT_PLAYER] == 1 and index == constants.P1_SCORE:
         freeTurn = constants.FREE_TURN
-    if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index == 13:
+    if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index == constants.P2_SCORE:
         freeTurn = constants.FREE_TURN
     if freeTurn == constants.FREE_TURN:
         print("Free turn!")
         print("")
     return freeTurn
+
+#
+# Check for a steal
+#
+def checkSteal(mancalaBoard, index):
+    stealIndex = 12 - index
+    # If the last pebble was dropped into an empty pod and the pod opposite is not empty
+    if mancalaBoard[index] == 1 and mancalaBoard[stealIndex] > 0:
+        # If player 1 dropped into a pod on their side, steal
+        if mancalaBoard[constants.CURRENT_PLAYER] == 1 and index < 6:
+            print("Steal pod %s!" % stealIndex)
+            print("")
+            mancalaBoard = steal(mancalaBoard, index, constants.P1_SCORE)
+        # if player 2 dropped into a pod on their side, steal
+        if mancalaBoard[constants.CURRENT_PLAYER] == 2 and index > 6:
+            # Because on player 1 side of the board the pod index starts at 0
+            visibleStealIndex = stealIndex + 1
+            print("Steal pod %s!" % visibleStealIndex)
+            print("")
+            mancalaBoard = steal(mancalaBoard, index, constants.P2_SCORE)
+    return mancalaBoard
 
 # Process a game turn
 def gameTurn(mancalaBoard, podIndex):
@@ -154,23 +175,7 @@ def gameTurn(mancalaBoard, podIndex):
         mancalaBoard[index] = mancalaBoard[index] + 1
     # Special rules
     freeTurn = checkFreeTurn(mancalaBoard, index)
-    if mancalaBoard[constants.CURRENT_PLAYER] == 1:
-        # Drop on own side in empty pod, steal opposing pod
-        if index > -1 and index < 6:
-            if mancalaBoard[index] == 1 and mancalaBoard[12-index] != 0:
-                stealIndex = 12 - index
-                print("Steal pod %s!" % stealIndex)
-                print("")
-                mancalaBoard = steal(mancalaBoard, index, 6)
-    if mancalaBoard[constants.CURRENT_PLAYER] == 2:
-        # Drop on own side in empty pod, steal opposing pod
-        if index > 6 and index < 13:
-            if mancalaBoard[index] == 1 and mancalaBoard[12-index] != 0:
-                stealIndex = 12 - index
-                visibleStealIndex = stealIndex + 1
-                print("Steal pod %s!" % visibleStealIndex)
-                print("")
-                mancalaBoard = steal(mancalaBoard, index, 13)
+    mancalaBoard = checkSteal(mancalaBoard, index)
     # Advance to next player
     if freeTurn == constants.NO_FREE_TURN:
         if mancalaBoard[constants.CURRENT_PLAYER] == 1:
@@ -214,12 +219,13 @@ def printGameBoard(mancalaBoard):
 
 # Gameplay loop
 mancalaBoard = []
+lastMancalaBoard = []
 numPebbles = 4
 debug = 1
 mancalaBoard = initGameBoard(mancalaBoard, numPebbles)
-playerInput = "X"
+lastMancalaBoard = mancalaBoard
 # Loop until the game is over
-while mancalaBoard[16] != 1:
+while mancalaBoard[constants.TURN_RESULT] != constants.GAME_COMPLETE:
     print("")
     printGameBoard(mancalaBoard)
     if debug == 1:
@@ -232,24 +238,30 @@ while mancalaBoard[16] != 1:
     else:
         print("Player: %s" % mancalaBoard[constants.CURRENT_PLAYER])
         if mancalaBoard[constants.CURRENT_PLAYER] == 1:
-            print("Select cala to play (1-6), U to undo, or X to exit")
+            print("Select pod to play (1-6), U to undo, or X to exit")
         if mancalaBoard[constants.CURRENT_PLAYER] == 2:
-            print("Select cala to play (7-12), U to undo, or X to exit")
+            print("Select pod to play (7-12), U to undo, or X to exit")
     playerInput = input()
     print("")
     if playerInput == "X" or playerInput == "x":
         # Exit game
         print("Exiting game")
         break
-    mancalaBoard = gameTurn(mancalaBoard, int(playerInput))
-    if mancalaBoard[16] < 0:
-        print("Illegal move, try again.")
-if mancalaBoard[16] == 1:
+    if playerInput == "U" or playerInput == "u":
+        # Undo last move
+        # BUGBUG this isn't working yet
+        mancalaBoard = lastMancalaBoard
+    else:
+        lastMancalaBoard = mancalaBoard
+        mancalaBoard = gameTurn(mancalaBoard, int(playerInput))
+        if mancalaBoard[constants.TURN_RESULT] < 0:
+            print("Illegal move, try again.")
+if mancalaBoard[constants.TURN_RESULT] == constants.GAME_COMPLETE:
     printGameBoard(mancalaBoard)
     print("")
-    if mancalaBoard[6] > mancalaBoard[13]:
+    if mancalaBoard[constants.P1_SCORE] > mancalaBoard[constants.P2_SCORE]:
         print("Player 1 wins!")
-    elif mancalaBoard[13] > mancalaBoard [6]:
+    elif mancalaBoard[constants.P2_SCORE] > mancalaBoard [constants.P1_SCORE]:
         print("Player 2 wins!")
     else:
         print("Game ends in a tie!")
